@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 /* purpose of this UserHandler class is to handle http verbs and endpoints */
 /* hierarchy dependency injection -> userhandler -> userservice -> userdao */
@@ -30,14 +31,30 @@ public class UserHandler {
         this.mapper = mapper;
     }
 
-    public void signup(Context c) throws IOException {
-        NewUserRequest req = mapper.readValue(c.req.getInputStream(), NewUserRequest.class);
+    public void signup(Context ctx) throws IOException {
+        NewUserRequest req = mapper.readValue(ctx.req.getInputStream(), NewUserRequest.class);
         try {
-            userService.saveUser(req);
-            c.status(201); // CREATED
+            logger.info("Attempting too signup...");
+
+            User createdUser = null;
+
+            if (userService.isValidUsername(req.getUsername())) {
+                if (userService.isUniqueUsername(req.getUsername())) {
+                    if (userService.isValidPassword(req.getPassword1())) {
+                        if (userService.isSamePassword(req.getPassword1(), req.getPassword2())) {
+                            createdUser = userService.signup(req);
+                        }
+                    }
+                }
+            }
+
+            ctx.status(201); // CREATED
+            ctx.json(Objects.requireNonNull(createdUser));
+            logger.info("Signup attempt successful...");
         } catch (InvalidUserException e) {
-            c.status(403); // FORBIDDEN
-            c.json(e);
+            ctx.status(403); // FORBIDDEN
+            ctx.json(e);
+            logger.info("Signup attempt unsuccessful...");
         }
     }
 
@@ -48,7 +65,8 @@ public class UserHandler {
 
             Principal principal = tokenService.extractRequesterDetails(token);
             if (principal == null) throw new InvalidAuthException("Invalid token");
-            if (!principal.getRole().equals(Role.ADMIN)) throw new InvalidAuthException("You are not authorized to do this");
+            if (!principal.getRole().equals(Role.ADMIN))
+                throw new InvalidAuthException("You are not authorized to do this");
 
             List<User> users = userService.getAllUsers();
             ctx.json(users);
@@ -65,7 +83,8 @@ public class UserHandler {
 
             Principal principal = tokenService.extractRequesterDetails(token);
             if (principal == null) throw new InvalidAuthException("Invalid token");
-            if (!principal.getRole().equals(Role.ADMIN)) throw new InvalidAuthException("You are not authorized to do this");
+            if (!principal.getRole().equals(Role.ADMIN))
+                throw new InvalidAuthException("You are not authorized to do this");
 
             String username = ctx.req.getParameter("username");
             List<User> users = userService.getAllUsersByUsername(username);

@@ -29,8 +29,10 @@ public class AuthHandler {
 
     public void authenticateUser(Context ctx) throws IOException {
         NewLoginRequest req = mapper.readValue(ctx.req.getInputStream(), NewLoginRequest.class);
-        logger.info("Attempting to login...");
+
         try {
+            logger.info("Attempting to login...");
+
             Principal principal = userService.login(req);
 
             /* generate token from principal obj */
